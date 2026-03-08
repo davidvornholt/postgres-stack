@@ -100,6 +100,42 @@ To stop this mode later, use the same file combination:
 docker compose -f compose.shared-network.yaml --profile prod --profile dev down
 ```
 
+### Using Dokploy on the Same VPS
+
+If Dokploy runs on the same Docker host, Dokploy-managed workloads can reach these databases by joining the same external Docker network.
+
+For Dokploy Docker Compose projects, add the shared network as an external network in the Dokploy Compose file:
+
+```yaml
+services:
+   app:
+      image: ghcr.io/example/app:latest
+      networks:
+         - postgres-shared
+
+networks:
+   postgres-shared:
+      external: true
+      name: postgres-shared
+```
+
+If you use a custom network name, replace `postgres-shared` with the value of `POSTGRES_SHARED_NETWORK`.
+
+For Dokploy Dockerfile applications, attach the application to the same Docker network in Dokploy's network settings, then redeploy. Use the external network name directly, for example `postgres-shared`.
+
+If your Dokploy version does not expose a persistent network attachment setting for Dockerfile applications, the reliable workaround is to deploy that workload as a Dokploy Compose project instead. A manual `docker network connect` works only until the next redeploy.
+
+Once attached, connect from Dokploy to either database by service name on port `5432`:
+
+- `postgres-prod:5432`
+- `postgres-dev:5432`
+
+For example:
+
+```dotenv
+DATABASE_URL=postgresql://postgres:change-me-prod@postgres-prod:5432/postgres
+```
+
 ## Configuration
 
 Set these values in `.env`:

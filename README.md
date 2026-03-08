@@ -2,7 +2,7 @@
 
 Postgres Stack is a reusable Docker Compose starter that runs two independent PostgreSQL 18 instances in one project:
 
-- `postgres-prod` on host port `5423`
+- `postgres-prod` on host port `5432`
 - `postgres-dev` on host port `5433`
 
 It is designed for robust single-host use with persistent storage, health checks, restart policies, safe network defaults, and an opt-in internal-only shared-network mode.
@@ -96,7 +96,7 @@ If you want the databases reachable only from other Docker containers and not fr
 
    You can also start the same services by naming them explicitly, for example `docker compose -f compose.shared-network.yaml up -d postgres-prod postgres-dev`. The recommended form is enabling both profiles, because both database services are profile-gated and the profile-based command better reflects the intended prod-plus-dev startup mode.
 
-In this mode, Docker does not publish PostgreSQL ports to the host, so `127.0.0.1:5423` and `127.0.0.1:5433` are not available.
+In this mode, Docker does not publish PostgreSQL ports to the host, so `127.0.0.1:5432` and `127.0.0.1:5433` are not available.
 
 To stop this mode later, use the same file combination:
 
@@ -148,7 +148,7 @@ Set these values in `.env`:
 | --- | --- | --- |
 | `POSTGRES_PROD_BIND_HOST` | Host/IP for the production port binding | `127.0.0.1` |
 | `POSTGRES_DEV_BIND_HOST` | Host/IP for the development port binding | `127.0.0.1` |
-| `POSTGRES_PROD_PORT` | Published production port | `5423` |
+| `POSTGRES_PROD_PORT` | Published production port | `5432` |
 | `POSTGRES_DEV_PORT` | Published development port | `5433` |
 | `POSTGRES_SHARED_NETWORK` | External Docker network name for internal-only mode | `postgres-shared` |
 | `POSTGRES_PROD_USER` | Production database user | `postgres` |
@@ -173,7 +173,7 @@ From the host machine:
 Examples with default host bindings:
 
 ```text
-postgresql://postgres:change-me-prod@127.0.0.1:5423/postgres
+postgresql://postgres:change-me-prod@127.0.0.1:5432/postgres
 postgresql://postgres:change-me-dev@127.0.0.1:5433/postgres
 ```
 

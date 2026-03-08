@@ -1,0 +1,46 @@
+services:
+  postgres-prod:
+    image: postgres:18
+    restart: unless-stopped
+    profiles:
+      - prod
+    environment:
+      POSTGRES_USER: ${POSTGRES_PROD_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PROD_PASSWORD:-change-me-prod}
+    ports:
+      - "${POSTGRES_PROD_BIND_HOST:-127.0.0.1}:${POSTGRES_PROD_PORT:-5423}:5432"
+    volumes:
+      - postgres_prod_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$$POSTGRES_USER" -d postgres
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  postgres-dev:
+    image: postgres:18
+    restart: unless-stopped
+    profiles:
+      - dev
+    environment:
+      POSTGRES_USER: ${POSTGRES_DEV_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_DEV_PASSWORD:-change-me-dev}
+    ports:
+      - "${POSTGRES_DEV_BIND_HOST:-127.0.0.1}:${POSTGRES_DEV_PORT:-5433}:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$$POSTGRES_USER" -d postgres
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  postgres_prod_data:
+  postgres_dev_data:

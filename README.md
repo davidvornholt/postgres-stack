@@ -5,7 +5,7 @@ Postgres Stack is a reusable Docker Compose starter that runs two independent Po
 - `postgres-prod` on host port `5432`
 - `postgres-dev` on host port `5433`
 
-It is designed for robust single-host use with persistent storage, health checks, restart policies, safe network defaults, and an opt-in internal-only shared-network mode.
+It is designed for robust single-host use with persistent storage, health checks, restart policies, safe network defaults, and optional shared-network access for container-to-container connectivity.
 
 ## What You Get
 
@@ -15,7 +15,7 @@ It is designed for robust single-host use with persistent storage, health checks
 - Health checks with `pg_isready`
 - `restart: unless-stopped` for both services
 - Configurable host bind addresses with `127.0.0.1` as the default
-- Optional internal-only mode on a shared external Docker network
+- Optional shared external Docker network support, either internal-only or combined with localhost access
 - Optional declarative bootstrap manifests for extra roles and databases
 
 ## Quick Start
@@ -72,9 +72,31 @@ Remove containers and volumes:
 docker compose --profile prod --profile dev down -v
 ```
 
-## Shared-Network Mode
+## Networking Modes
 
-If you want the databases reachable only from other Docker containers and not from the host machine at all, use the dedicated shared-network Compose file.
+By default, this stack publishes PostgreSQL only to `127.0.0.1` on the host:
+
+```bash
+docker compose --profile prod --profile dev up -d
+```
+
+If you also want other Docker workloads on the same host to reach the databases by service name, add the shared-network override on top of the base Compose file:
+
+```bash
+docker network create postgres-shared
+docker compose -f compose.yaml -f compose.shared-network.yaml --profile prod --profile dev up -d
+```
+
+In this combined mode:
+
+- the host can still use `127.0.0.1:5432` and `127.0.0.1:5433`
+- containers on the shared external network can use `postgres-prod:5432` and `postgres-dev:5432`
+
+If you want the databases reachable only from other Docker containers and not from the host machine at all, use the shared-network file by itself.
+
+## Shared-Network-Only Mode
+
+Use this mode when you want container-to-container access on the shared external network without publishing PostgreSQL ports to the host.
 
 1. Create the external Docker network once:
 
@@ -88,7 +110,7 @@ If you want the databases reachable only from other Docker containers and not fr
    POSTGRES_SHARED_NETWORK=postgres-shared
    ```
 
-3. Start the stack with the shared-network file:
+3. Start the stack with only the shared-network file:
 
    ```bash
    docker compose -f compose.shared-network.yaml --profile prod --profile dev up -d
@@ -106,7 +128,7 @@ docker compose -f compose.shared-network.yaml --profile prod --profile dev down
 
 ### Using Dokploy on the Same VPS
 
-If Dokploy runs on the same Docker host, Dokploy-managed workloads can reach these databases by joining the same external Docker network.
+If Dokploy runs on the same Docker host, Dokploy-managed workloads can reach these databases by joining the same external Docker network. This applies to both shared-network-only mode and the combined mode above.
 
 For Dokploy Docker Compose projects, add the shared network as an external network in the Dokploy Compose file:
 
@@ -150,7 +172,7 @@ Set these values in `.env`:
 | `POSTGRES_DEV_BIND_HOST` | Host/IP for the development port binding | `127.0.0.1` |
 | `POSTGRES_PROD_PORT` | Published production port | `5432` |
 | `POSTGRES_DEV_PORT` | Published development port | `5433` |
-| `POSTGRES_SHARED_NETWORK` | External Docker network name for internal-only mode | `postgres-shared` |
+| `POSTGRES_SHARED_NETWORK` | External Docker network name for shared-network modes | `postgres-shared` |
 | `POSTGRES_PROD_USER` | Production database user | `postgres` |
 | `POSTGRES_DEV_USER` | Development database user | `postgres` |
 | `POSTGRES_PROD_PASSWORD` | Production database password | `change-me-prod` |
@@ -184,7 +206,7 @@ From another container in the same Compose project, connect to the service name 
 - `postgres-prod:5432`
 - `postgres-dev:5432`
 
-From another container on the shared external network, use the same service names:
+From another container on the shared external network, use the same service names when you start the stack with `compose.shared-network.yaml`, either by itself or layered with `compose.yaml`:
 
 - `postgres-prod:5432`
 - `postgres-dev:5432`
@@ -312,7 +334,9 @@ POSTGRES_DEV_BIND_HOST=192.168.1.50
 
 Use this only when you intend to accept connections from other machines on your network, and make sure your firewall rules and passwords are appropriate for that exposure.
 
-If you use `compose.shared-network.yaml`, these bind host settings and host ports are ignored because the services are no longer published to the host.
+If you use only `compose.shared-network.yaml`, these bind host settings and host ports are ignored because the services are no longer published to the host.
+
+If you layer `compose.shared-network.yaml` on top of `compose.yaml`, the host bindings still apply and the services also join the shared external network.
 
 ## Persistence
 
@@ -330,4 +354,4 @@ Recreating containers does not remove database contents. Use `docker compose dow
 - This project is a production-oriented Compose starter, not a high-availability PostgreSQL cluster.
 - It does not include replication, automated backups, failover, or secrets management.
 - If you expose the databases beyond `127.0.0.1`, replace the default passwords before starting the stack.
-- Shared-network mode assumes the external Docker network already exists before `docker compose up`.
+- Any mode that includes `compose.shared-network.yaml` assumes the external Docker network already exists before `docker compose up`.

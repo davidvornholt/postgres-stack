@@ -15,6 +15,7 @@ It is designed for robust single-host use with persistent storage, health checks
 - Health checks with `pg_isready`
 - `restart: unless-stopped` for both services
 - Configurable host bind addresses with `127.0.0.1` as the default
+- Optional declarative bootstrap manifests for extra roles and databases
 
 ## Quick Start
 
@@ -26,13 +27,15 @@ It is designed for robust single-host use with persistent storage, health checks
 
 2. Update the passwords in `.env`.
 
-3. Start both databases:
+3. Optionally add declarative bootstrap manifests under `bootstrap/prod` or `bootstrap/dev` if you want extra roles or databases on first startup.
+
+4. Start both databases:
 
    ```bash
    docker compose up -d postgres-prod postgres-dev
    ```
 
-4. Check status:
+5. Check status:
 
    ```bash
    docker compose ps
@@ -81,6 +84,13 @@ Set these values in `.env`:
 | `POSTGRES_PROD_PASSWORD` | Production database password | `change-me-prod` |
 | `POSTGRES_DEV_PASSWORD` | Development database password | `change-me-dev` |
 
+Extra roles and databases are configured with manifest files, not additional environment variables:
+
+- Production roles: `bootstrap/prod/roles/*.conf`
+- Production databases: `bootstrap/prod/databases/*.conf`
+- Development roles: `bootstrap/dev/roles/*.conf`
+- Development databases: `bootstrap/dev/databases/*.conf`
+
 ## Connection Details
 
 From the host machine:
@@ -102,6 +112,109 @@ From another container in the same Compose project, connect to the service name 
 - `postgres-prod:5432`
 - `postgres-dev:5432`
 
+## Declarative Bootstrap
+
+This stack can optionally create extra PostgreSQL roles and databases during cluster initialization by reading manifest files from the `bootstrap/` directory tree.
+
+Key behavior:
+
+- The bootstrap step is optional. Empty manifest directories are a no-op.
+- Manifests are processed only when PostgreSQL initializes a fresh data directory. Restarting an existing container does not re-run them.
+- Role manifests are applied before database manifests, so database owners can be declared as extra roles in the same instance.
+- The bootstrap script validates keys and basic identifier safety before issuing SQL.
+- A bootstrap failure clears the incomplete data directory so the container does not continue with a partially initialized cluster.
+
+Production note:
+
+- Keep secret material out of Git. The repo ignores `bootstrap/prod/secrets/*` and `bootstrap/dev/secrets/*`.
+- For production roles, prefer `ROLE_PASSWORD_FILE` over inline `ROLE_PASSWORD`.
+
+### Role Manifest Format
+
+Create one file per extra role in `bootstrap/<instance>/roles/`, for example `bootstrap/prod/roles/app.conf`:
+
+```dotenv
+ROLE_NAME=app_prod
+ROLE_PASSWORD_FILE=secrets/app_prod.password
+ROLE_LOGIN=true
+ROLE_SUPERUSER=false
+ROLE_CREATEDB=false
+ROLE_CREATEROLE=false
+ROLE_REPLICATION=false
+ROLE_BYPASSRLS=false
+```
+
+Supported keys:
+
+- `ROLE_NAME` (required)
+- `ROLE_PASSWORD` or `ROLE_PASSWORD_FILE` for `LOGIN` roles
+- `ROLE_LOGIN` default `true`
+- `ROLE_SUPERUSER` default `false`
+- `ROLE_CREATEDB` default `false`
+- `ROLE_CREATEROLE` default `false`
+- `ROLE_REPLICATION` default `false`
+- `ROLE_BYPASSRLS` default `false`
+
+Behavior:
+
+- Login roles must provide either `ROLE_PASSWORD` or `ROLE_PASSWORD_FILE`.
+- `ROLE_PASSWORD_FILE` is resolved relative to the mounted instance bootstrap directory, so `secrets/app_prod.password` means `bootstrap/prod/secrets/app_prod.password`.
+- The bootstrap superuser from `POSTGRES_*_USER` is intentionally managed only through `.env`, not through extra-role manifests.
+
+### Database Manifest Format
+
+Create one file per extra database in `bootstrap/<instance>/databases/`, for example `bootstrap/prod/databases/app.conf`:
+
+```dotenv
+DATABASE_NAME=app_prod
+DATABASE_OWNER=app_prod
+DATABASE_ENCODING=UTF8
+```
+
+Supported keys:
+
+- `DATABASE_NAME` (required)
+- `DATABASE_OWNER` default `POSTGRES_*_USER`
+- `DATABASE_TEMPLATE` optional
+- `DATABASE_ENCODING` optional
+- `DATABASE_LC_COLLATE` optional
+- `DATABASE_LC_CTYPE` optional
+
+Behavior:
+
+- The named owner must already exist, either as the bootstrap user or from a role manifest.
+- `DATABASE_TEMPLATE`, `DATABASE_ENCODING`, `DATABASE_LC_COLLATE`, and `DATABASE_LC_CTYPE` are creation-time settings. If the database already exists at bootstrap time, they are not reapplied.
+- Reserved database names such as `postgres`, `template0`, and `template1` are rejected.
+
+### Example Layout
+
+```text
+bootstrap/
+  prod/
+    roles/
+      app.conf
+    databases/
+      app.conf
+    secrets/
+      app_prod.password
+  dev/
+    roles/
+      app.conf
+    databases/
+      app.conf
+```
+
+Working examples are included under `bootstrap/examples/`.
+
+### Applying Changes Later
+
+Manifest changes do not reconcile into an already-initialized data volume. To apply a changed bootstrap manifest:
+
+1. Use a fresh data volume for that instance, or
+2. Apply the equivalent SQL change manually to the running database.
+
+This first-start-only behavior is deliberate because automatically reconciling live roles and databases can create production surprises.
+
 ## Changing the Bind Host
 
 By default, both PostgreSQL ports are only reachable from the same machine.
@@ -121,6 +234,8 @@ Data is stored in named Docker volumes:
 
 - `postgres_prod_data`
 - `postgres_dev_data`
+
+With PostgreSQL 18, the volumes are mounted at `/var/lib/postgresql` to match the official image's versioned on-disk layout.
 
 Recreating containers does not remove database contents. Use `docker compose down -v` only when you intentionally want to delete all stored data for both instances.
 

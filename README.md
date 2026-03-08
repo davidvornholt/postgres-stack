@@ -33,7 +33,7 @@ It is designed for robust single-host use with persistent storage, health checks
 4. Start both databases:
 
    ```bash
-   docker compose up -d postgres-prod postgres-dev
+   docker compose --profile prod --profile dev up -d
    ```
 
 5. Check status:
@@ -49,14 +49,16 @@ The project includes Compose profiles so you can start one instance by profile w
 Start only production:
 
 ```bash
-docker compose --profile prod up -d postgres-prod
+docker compose --profile prod up -d
 ```
 
 Start only development:
 
 ```bash
-docker compose --profile dev up -d postgres-dev
+docker compose --profile dev up -d
 ```
+
+You can also target service names directly, for example `docker compose up -d postgres-prod postgres-dev`, but this README recommends enabling profiles instead. Profiles match how the stack is organized, keep the commands symmetric with `down`, and continue to work cleanly if more services are later added to either profile.
 
 Stop everything:
 
@@ -89,8 +91,10 @@ If you want the databases reachable only from other Docker containers and not fr
 3. Start the stack with the shared-network file:
 
    ```bash
-   docker compose -f compose.shared-network.yaml up -d postgres-prod postgres-dev
+   docker compose -f compose.shared-network.yaml --profile prod --profile dev up -d
    ```
+
+   You can also start the same services by naming them explicitly, for example `docker compose -f compose.shared-network.yaml up -d postgres-prod postgres-dev`. The recommended form is enabling both profiles, because both database services are profile-gated and the profile-based command better reflects the intended prod-plus-dev startup mode.
 
 In this mode, Docker does not publish PostgreSQL ports to the host, so `127.0.0.1:5423` and `127.0.0.1:5433` are not available.
 

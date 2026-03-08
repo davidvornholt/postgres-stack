@@ -1,0 +1,73 @@
+services:
+  postgres-prod:
+    image: postgres:18
+    restart: unless-stopped
+    profiles:
+      - prod
+    environment:
+      POSTGRES_USER: ${POSTGRES_PROD_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PROD_PASSWORD:-change-me-prod}
+    expose:
+      - "5432"
+    volumes:
+      - postgres_prod_data:/var/lib/postgresql
+      - type: bind
+        source: ./docker/init/010-bootstrap-extra.sh
+        target: /docker-entrypoint-initdb.d/010-bootstrap-extra.sh
+        read_only: true
+      - type: bind
+        source: ./bootstrap/prod
+        target: /postgres-stack/bootstrap
+        read_only: true
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$$POSTGRES_USER" -d postgres
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - default
+      - postgres-shared
+
+  postgres-dev:
+    image: postgres:18
+    restart: unless-stopped
+    profiles:
+      - dev
+    environment:
+      POSTGRES_USER: ${POSTGRES_DEV_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_DEV_PASSWORD:-change-me-dev}
+    expose:
+      - "5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql
+      - type: bind
+        source: ./docker/init/010-bootstrap-extra.sh
+        target: /docker-entrypoint-initdb.d/010-bootstrap-extra.sh
+        read_only: true
+      - type: bind
+        source: ./bootstrap/dev
+        target: /postgres-stack/bootstrap
+        read_only: true
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$$POSTGRES_USER" -d postgres
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - default
+      - postgres-shared
+
+networks:
+  postgres-shared:
+    name: ${POSTGRES_SHARED_NETWORK:-postgres-shared}
+    external: true
+
+volumes:
+  postgres_prod_data:
+  postgres_dev_data:

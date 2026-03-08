@@ -5,7 +5,7 @@ Postgres Stack is a reusable Docker Compose starter that runs two independent Po
 - `postgres-prod` on host port `5423`
 - `postgres-dev` on host port `5433`
 
-It is designed for robust single-host use with persistent storage, health checks, restart policies, and safe network defaults.
+It is designed for robust single-host use with persistent storage, health checks, restart policies, safe network defaults, and an opt-in internal-only shared-network mode.
 
 ## What You Get
 
@@ -15,6 +15,7 @@ It is designed for robust single-host use with persistent storage, health checks
 - Health checks with `pg_isready`
 - `restart: unless-stopped` for both services
 - Configurable host bind addresses with `127.0.0.1` as the default
+- Optional internal-only mode on a shared external Docker network
 - Optional declarative bootstrap manifests for extra roles and databases
 
 ## Quick Start
@@ -60,13 +61,43 @@ docker compose --profile dev up -d postgres-dev
 Stop everything:
 
 ```bash
-docker compose down
+docker compose --profile prod --profile dev down
 ```
 
 Remove containers and volumes:
 
 ```bash
-docker compose down -v
+docker compose --profile prod --profile dev down -v
+```
+
+## Shared-Network Mode
+
+If you want the databases reachable only from other Docker containers and not from the host machine at all, use the dedicated shared-network Compose file.
+
+1. Create the external Docker network once:
+
+   ```bash
+   docker network create postgres-shared
+   ```
+
+2. Set the network name in `.env` if you do not want the default:
+
+   ```dotenv
+   POSTGRES_SHARED_NETWORK=postgres-shared
+   ```
+
+3. Start the stack with the shared-network file:
+
+   ```bash
+   docker compose -f compose.shared-network.yaml up -d postgres-prod postgres-dev
+   ```
+
+In this mode, Docker does not publish PostgreSQL ports to the host, so `127.0.0.1:5423` and `127.0.0.1:5433` are not available.
+
+To stop this mode later, use the same file combination:
+
+```bash
+docker compose -f compose.shared-network.yaml --profile prod --profile dev down
 ```
 
 ## Configuration
@@ -79,6 +110,7 @@ Set these values in `.env`:
 | `POSTGRES_DEV_BIND_HOST` | Host/IP for the development port binding | `127.0.0.1` |
 | `POSTGRES_PROD_PORT` | Published production port | `5423` |
 | `POSTGRES_DEV_PORT` | Published development port | `5433` |
+| `POSTGRES_SHARED_NETWORK` | External Docker network name for internal-only mode | `postgres-shared` |
 | `POSTGRES_PROD_USER` | Production database user | `postgres` |
 | `POSTGRES_DEV_USER` | Development database user | `postgres` |
 | `POSTGRES_PROD_PASSWORD` | Production database password | `change-me-prod` |
@@ -111,6 +143,18 @@ From another container in the same Compose project, connect to the service name 
 
 - `postgres-prod:5432`
 - `postgres-dev:5432`
+
+From another container on the shared external network, use the same service names:
+
+- `postgres-prod:5432`
+- `postgres-dev:5432`
+
+For example, if another Compose project joins the same external network, it can connect with URLs like:
+
+```text
+postgresql://postgres:change-me-prod@postgres-prod:5432/postgres
+postgresql://postgres:change-me-dev@postgres-dev:5432/postgres
+```
 
 ## Declarative Bootstrap
 
@@ -228,6 +272,8 @@ POSTGRES_DEV_BIND_HOST=192.168.1.50
 
 Use this only when you intend to accept connections from other machines on your network, and make sure your firewall rules and passwords are appropriate for that exposure.
 
+If you use `compose.shared-network.yaml`, these bind host settings and host ports are ignored because the services are no longer published to the host.
+
 ## Persistence
 
 Data is stored in named Docker volumes:
@@ -244,3 +290,4 @@ Recreating containers does not remove database contents. Use `docker compose dow
 - This project is a production-oriented Compose starter, not a high-availability PostgreSQL cluster.
 - It does not include replication, automated backups, failover, or secrets management.
 - If you expose the databases beyond `127.0.0.1`, replace the default passwords before starting the stack.
+- Shared-network mode assumes the external Docker network already exists before `docker compose up`.

@@ -1,4 +1,4 @@
-# Postgres Stack
+# Postgres stack
 
 Postgres Stack is a reusable Docker Compose starter that runs two independent PostgreSQL 18 instances in one project:
 
@@ -7,7 +7,7 @@ Postgres Stack is a reusable Docker Compose starter that runs two independent Po
 
 It is designed for robust single-host use with persistent storage, health checks, restart policies, safe network defaults, and optional shared-network access for container-to-container connectivity.
 
-## What You Get
+## What you get
 
 - PostgreSQL 18 pinned in Compose
 - Separate production and development database instances
@@ -16,9 +16,8 @@ It is designed for robust single-host use with persistent storage, health checks
 - `restart: unless-stopped` for both services
 - Configurable host bind addresses with `127.0.0.1` as the default
 - Optional shared external Docker network support, either internal-only or combined with localhost access
-- Optional declarative bootstrap manifests for extra roles and databases
 
-## Quick Start
+## Quick start
 
 1. Copy the environment template:
 
@@ -28,21 +27,19 @@ It is designed for robust single-host use with persistent storage, health checks
 
 2. Update the passwords in `.env`.
 
-3. Optionally add declarative bootstrap manifests under `bootstrap/prod` or `bootstrap/dev` if you want extra roles or databases on first startup.
-
-4. Start both databases:
+3. Start both databases:
 
    ```bash
    docker compose --profile prod --profile dev up -d
    ```
 
-5. Check status:
+4. Check status:
 
    ```bash
    docker compose ps
    ```
 
-## Selective Startup
+## Selective startup
 
 The project includes Compose profiles so you can start one instance by profile when needed.
 
@@ -72,7 +69,7 @@ Remove containers and volumes:
 docker compose --profile prod --profile dev down -v
 ```
 
-## Networking Modes
+## Networking modes
 
 By default, this stack publishes PostgreSQL only to `127.0.0.1` on the host:
 
@@ -94,7 +91,7 @@ In this combined mode:
 
 If you want the databases reachable only from other Docker containers and not from the host machine at all, use the shared-network file by itself.
 
-## Shared-Network-Only Mode
+## Shared-network-only mode
 
 Use this mode when you want container-to-container access on the shared external network without publishing PostgreSQL ports to the host.
 
@@ -126,11 +123,11 @@ To stop this mode later, use the same file combination:
 docker compose -f compose.shared-network.yaml --profile prod --profile dev down
 ```
 
-### Using Dokploy on the Same VPS
+### Connecting other Docker workloads
 
-If Dokploy runs on the same Docker host, Dokploy-managed workloads can reach these databases by joining the same external Docker network. This applies to both shared-network-only mode and the combined mode above.
+Other Docker workloads on the same host can reach these databases by joining the same external Docker network. This applies to both shared-network-only mode and the combined mode above.
 
-For Dokploy Docker Compose projects, add the shared network as an external network in the Dokploy Compose file:
+For another Docker Compose project, add the shared network as an external network:
 
 ```yaml
 services:
@@ -147,11 +144,7 @@ networks:
 
 If you use a custom network name, replace `postgres-shared` with the value of `POSTGRES_SHARED_NETWORK`.
 
-For Dokploy Dockerfile applications, attach the application to the same Docker network in Dokploy's network settings, then redeploy. Use the external network name directly, for example `postgres-shared`.
-
-If your Dokploy version does not expose a persistent network attachment setting for Dockerfile applications, the reliable workaround is to deploy that workload as a Dokploy Compose project instead. A manual `docker network connect` works only until the next redeploy.
-
-Once attached, connect from Dokploy to either database by service name on port `5432`:
+Once attached, connect to either database by service name on port `5432`:
 
 - `postgres-prod:5432`
 - `postgres-dev:5432`
@@ -178,14 +171,7 @@ Set these values in `.env`:
 | `POSTGRES_PROD_PASSWORD` | Production database password | `change-me-prod` |
 | `POSTGRES_DEV_PASSWORD` | Development database password | `change-me-dev` |
 
-Extra roles and databases are configured with manifest files, not additional environment variables:
-
-- Production roles: `bootstrap/prod/roles/*.conf`
-- Production databases: `bootstrap/prod/databases/*.conf`
-- Development roles: `bootstrap/dev/roles/*.conf`
-- Development databases: `bootstrap/dev/databases/*.conf`
-
-## Connection Details
+## Connection details
 
 From the host machine:
 
@@ -218,110 +204,7 @@ postgresql://postgres:change-me-prod@postgres-prod:5432/postgres
 postgresql://postgres:change-me-dev@postgres-dev:5432/postgres
 ```
 
-## Declarative Bootstrap
-
-This stack can optionally create extra PostgreSQL roles and databases during cluster initialization by reading manifest files from the `bootstrap/` directory tree.
-
-Key behavior:
-
-- The bootstrap step is optional. Empty manifest directories are a no-op.
-- Manifests are processed only when PostgreSQL initializes a fresh data directory. Restarting an existing container does not re-run them.
-- Role manifests are applied before database manifests, so database owners can be declared as extra roles in the same instance.
-- The bootstrap script validates keys and basic identifier safety before issuing SQL.
-- A bootstrap failure clears the incomplete data directory so the container does not continue with a partially initialized cluster.
-
-Production note:
-
-- Keep secret material out of Git. The repo ignores `bootstrap/prod/secrets/*` and `bootstrap/dev/secrets/*`.
-- For production roles, prefer `ROLE_PASSWORD_FILE` over inline `ROLE_PASSWORD`.
-
-### Role Manifest Format
-
-Create one file per extra role in `bootstrap/<instance>/roles/`, for example `bootstrap/prod/roles/app.conf`:
-
-```dotenv
-ROLE_NAME=app_prod
-ROLE_PASSWORD_FILE=secrets/app_prod.password
-ROLE_LOGIN=true
-ROLE_SUPERUSER=false
-ROLE_CREATEDB=false
-ROLE_CREATEROLE=false
-ROLE_REPLICATION=false
-ROLE_BYPASSRLS=false
-```
-
-Supported keys:
-
-- `ROLE_NAME` (required)
-- `ROLE_PASSWORD` or `ROLE_PASSWORD_FILE` for `LOGIN` roles
-- `ROLE_LOGIN` default `true`
-- `ROLE_SUPERUSER` default `false`
-- `ROLE_CREATEDB` default `false`
-- `ROLE_CREATEROLE` default `false`
-- `ROLE_REPLICATION` default `false`
-- `ROLE_BYPASSRLS` default `false`
-
-Behavior:
-
-- Login roles must provide either `ROLE_PASSWORD` or `ROLE_PASSWORD_FILE`.
-- `ROLE_PASSWORD_FILE` is resolved relative to the mounted instance bootstrap directory, so `secrets/app_prod.password` means `bootstrap/prod/secrets/app_prod.password`.
-- The bootstrap superuser from `POSTGRES_*_USER` is intentionally managed only through `.env`, not through extra-role manifests.
-
-### Database Manifest Format
-
-Create one file per extra database in `bootstrap/<instance>/databases/`, for example `bootstrap/prod/databases/app.conf`:
-
-```dotenv
-DATABASE_NAME=app_prod
-DATABASE_OWNER=app_prod
-DATABASE_ENCODING=UTF8
-```
-
-Supported keys:
-
-- `DATABASE_NAME` (required)
-- `DATABASE_OWNER` default `POSTGRES_*_USER`
-- `DATABASE_TEMPLATE` optional
-- `DATABASE_ENCODING` optional
-- `DATABASE_LC_COLLATE` optional
-- `DATABASE_LC_CTYPE` optional
-
-Behavior:
-
-- The named owner must already exist, either as the bootstrap user or from a role manifest.
-- `DATABASE_TEMPLATE`, `DATABASE_ENCODING`, `DATABASE_LC_COLLATE`, and `DATABASE_LC_CTYPE` are creation-time settings. If the database already exists at bootstrap time, they are not reapplied.
-- Reserved database names such as `postgres`, `template0`, and `template1` are rejected.
-
-### Example Layout
-
-```text
-bootstrap/
-  prod/
-    roles/
-      app.conf
-    databases/
-      app.conf
-    secrets/
-      app_prod.password
-  dev/
-    roles/
-      app.conf
-    databases/
-      app.conf
-```
-
-Working examples are included under `bootstrap/examples/`.
-
-### Applying Changes Later
-
-Manifest changes do not reconcile into an already-initialized data volume. To apply a changed bootstrap manifest:
-
-1. Use a fresh data volume for that instance, or
-2. Apply the equivalent SQL change manually to the running database.
-
-This first-start-only behavior is deliberate because automatically reconciling live roles and databases can create production surprises.
-
-## Changing the Bind Host
+## Changing the bind host
 
 By default, both PostgreSQL ports are only reachable from the same machine.
 
@@ -349,7 +232,7 @@ With PostgreSQL 18, the volumes are mounted at `/var/lib/postgresql` to match th
 
 Recreating containers does not remove database contents. Use `docker compose down -v` only when you intentionally want to delete all stored data for both instances.
 
-## Operational Notes
+## Operational notes
 
 - This project is a production-oriented Compose starter, not a high-availability PostgreSQL cluster.
 - It does not include replication, automated backups, failover, or secrets management.

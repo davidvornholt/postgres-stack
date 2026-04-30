@@ -1,3 +1,0 @@
-.env
-bootstrap/prod/secrets/*
-bootstrap/dev/secrets/*

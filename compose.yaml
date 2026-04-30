@@ -11,14 +11,6 @@ services:
       - "${POSTGRES_PROD_BIND_HOST:-127.0.0.1}:${POSTGRES_PROD_PORT:-5432}:5432"
     volumes:
       - postgres_prod_data:/var/lib/postgresql
-      - type: bind
-        source: ./docker/init/010-bootstrap-extra.sh
-        target: /docker-entrypoint-initdb.d/010-bootstrap-extra.sh
-        read_only: true
-      - type: bind
-        source: ./bootstrap/prod
-        target: /postgres-stack/bootstrap
-        read_only: true
     healthcheck:
       test:
         - CMD-SHELL
@@ -40,14 +32,6 @@ services:
       - "${POSTGRES_DEV_BIND_HOST:-127.0.0.1}:${POSTGRES_DEV_PORT:-5433}:5432"
     volumes:
       - postgres_dev_data:/var/lib/postgresql
-      - type: bind
-        source: ./docker/init/010-bootstrap-extra.sh
-        target: /docker-entrypoint-initdb.d/010-bootstrap-extra.sh
-        read_only: true
-      - type: bind
-        source: ./bootstrap/dev
-        target: /postgres-stack/bootstrap
-        read_only: true
     healthcheck:
       test:
         - CMD-SHELL
